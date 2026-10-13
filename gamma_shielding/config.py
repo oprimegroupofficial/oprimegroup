@@ -38,6 +38,8 @@ class Config:
     samples: list[SampleCfg]
     blank_file: str | None = None
     blank_start: datetime | None = None
+    blank_scale: float = 1.0              # I0 rate multiplier (independently measured geometry/flux correction)
+    blank_scale_u: float = 0.0            # its standard uncertainty (relative, e.g. 0.01 = 1 %)
     coverage_k: float = 1.0
     min_significance: float = 5.0
     decay_correction: bool = False
@@ -139,6 +141,7 @@ def build_config(raw: dict, root: Path) -> Config:
         samples=samples,
         blank_file=blank.get("dosya"),
         blank_start=_dt(blank.get("baslangic")),
+        blank_scale=float(blank.get("olcek_carpani") or 1.0), blank_scale_u=float(blank.get("olcek_belirsizligi") or 0.0),
         coverage_k=float(raw.get("kapsam_katsayisi", 1.0)),
         min_significance=float(raw.get("min_anlamlilik", 5.0)),
         decay_correction=bool((raw.get("bozunma_duzeltmesi") or {}).get("etkin", False)),

@@ -48,6 +48,10 @@ def expected_spectrum(transmission: dict[str, float] | None = None) -> np.ndarra
         s = 3.5 / np.interp(e0, E, dEdch)          # collimator features are narrower than the NaI law (as in real data)
         mu = np.interp(e0, E, ch)
         y += a * (ndtr((ch + 0.5 - mu) / s) - ndtr((ch - 0.5 - mu) / s))
+    # strong ~65 keV peak (Am-241 region) that the sample absorbs; transmission key "Am-65"
+    s65 = 2.6 / np.interp(65.5, E, dEdch)
+    mu65 = np.interp(65.5, E, ch)
+    y += 15000.0 * transmission.get("Am-65", 1.0) * (ndtr((ch + 0.5 - mu65) / s65) - ndtr((ch - 0.5 - mu65) / s65))
     for label, (src, members, area) in GROUPS.items():
         w = {e: i for e, i in SOURCES[src]["lines"]}
         tot = sum(w[e] for e in members)

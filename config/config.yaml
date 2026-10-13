@@ -12,7 +12,7 @@ cikti_klasoru: output
 # Olcumu aldiginizda dosyayi data/raw/ icine koyup asagidaki satirin basindaki # isaretini
 # kaldirin ve dosya adini yazin. Tanimli degilse LAC/MAC/HVL... HESAPLANMAZ (yalnizca pikler).
 bos_olcum:
-  dosya: null                    # ornek: Bos_5kaynak_2saat.Spc
+  dosya: Bos_olcum_5kaynak_2saat.Spc
   baslangic: null                # istege bagli, bozunma duzeltmesi icin: "2026-10-13 08:00"
 
 # ----- Genel ayarlar -----------------------------------------------------------------
@@ -41,7 +41,7 @@ kalibrasyon:
 numuneler:
   - ad: Dy-0
     dosya: Dy2O3_00_5kaynak_2saat.Spc
-    kalinlik_mm: null
+    kalinlik_mm: 3.30
     kalinlik_belirsizlik_mm: 0.01
     yogunluk_g_cm3: [6.3748, 6.3794, 6.3459]
     kuramsal_yogunluk_g_cm3: 6.66
@@ -49,7 +49,7 @@ numuneler:
 
   - ad: Dy-5
     dosya: Dy2O3_05_5kaynak_2saat.Spc
-    kalinlik_mm: null
+    kalinlik_mm: 3.30
     kalinlik_belirsizlik_mm: 0.01
     yogunluk_g_cm3: [6.3123, 6.3090, 6.3181]
     kuramsal_yogunluk_g_cm3: 6.63
@@ -57,7 +57,7 @@ numuneler:
 
   - ad: Dy-10
     dosya: Dy2O3_10_5kaynak_2saat.Spc
-    kalinlik_mm: null
+    kalinlik_mm: 3.30
     kalinlik_belirsizlik_mm: 0.01
     yogunluk_g_cm3: [6.2684, 6.2597, 6.2975]
     kuramsal_yogunluk_g_cm3: 6.59
@@ -65,7 +65,7 @@ numuneler:
 
   - ad: Dy-20
     dosya: Dy2O3_20_5kaynak_2saat.Spc
-    kalinlik_mm: null
+    kalinlik_mm: 3.30
     kalinlik_belirsizlik_mm: 0.01
     yogunluk_g_cm3: [6.2435, 6.2984, 6.3006]
     kuramsal_yogunluk_g_cm3: 6.53

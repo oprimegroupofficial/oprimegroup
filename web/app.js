@@ -36,6 +36,9 @@ const DEMO = [   // gönderilen Dy2O3 serisi (kalınlık bilinmediği için boş
   { file: "Dy2O3_20_5kaynak_2saat.Spc", label: "Dy-20", density: "6.2435 6.2984 6.3006", theo: "6.53", comp: "Ni 0.5498; Al 0.1501; Bi 0.1002; Dy 0.1742; O 0.0257" },
 ];
 
+const DEMO_BLANK = { file: "Bos_olcum_5kaynak_2saat.Spc", label: "I0" };
+const DEMO_THICKNESS = "3.30";   // kullanıcının verdiği numune kalınlığı (mm)
+
 const state = {
   files: [], meta: {}, nextId: 1, ready: false, running: false, result: null,
   allLines: [], excluded: new Set(), xcomPath: null, blobs: {},
@@ -168,8 +171,12 @@ async function writeFile(id, blob) {
   return path;
 }
 
-async function addBlobs(items) {   // items: [{blob, file, label?, meta?}]
+async function addBlobs(items, role) {   // items: [{blob, file, label?, meta?}]; role: "blank" | "sample" | undefined (tahmin)
   await engineReady;
+  if (role === "blank") {                     // yalnızca bir numunesiz ölçüm: eskisini kaldır
+    items = items.slice(0, 1);
+    for (const f of state.files.filter((x) => x.role === "blank")) await removeFile(f.id, true);
+  }
   const added = [];
   for (const it of items) {
     const id = state.nextId++;
@@ -180,7 +187,7 @@ async function addBlobs(items) {   // items: [{blob, file, label?, meta?}]
   const info = await engine.call("inspect", { items: added.map((a) => ({ path: a.path, name: a.file })) });
   added.forEach((a, i) => {
     const r = info[i];
-    const f = { id: a.id, path: a.path, file: a.file, info: r, role: r.ok ? r.role : "ignore", label: a.label || (r.ok ? r.label : a.file) };
+    const f = { id: a.id, path: a.path, file: a.file, info: r, role: !r.ok ? "ignore" : (role || r.role), label: a.label || (r.ok ? r.label : a.file) };
     state.meta[a.id] = Object.assign(emptyMeta(), loadMetaFor(f.label) || {}, a.meta || {});
     state.files.push(f);
     if (!r.ok) $("#fileMsgs").append(h("div", { class: "banner err" }, `${a.file}: ${r.error}`));
@@ -219,16 +226,25 @@ function renderFiles() {
       h("td", { style: "min-width:150px" }, f.role === "blank" ? h("span", { class: "pill" }, "I₀") : r.ok ? name : ""),
       h("td", {}, h("button", { class: "link danger", type: "button", onclick: () => removeFile(f.id) }, "Kaldır"))));
   }
+  const blank = state.files.find((f) => f.role === "blank" && f.info.ok);
+  const bs = $("#blankStatus");
+  bs.className = "hint " + (blank ? "ok" : "");
+  bs.textContent = blank ? `✓ ${blank.file} — ${blank.info.counts.toLocaleString("tr-TR")} sayım, ${fmtNum(blank.info.live_time)} s`
+    : "Henüz yüklenmedi. Yüklenmezse LAC, MAC, HVL… hesaplanmaz; yalnızca pikler ve göreli zayıflama verilir.";
+  const ns = state.files.filter((f) => f.role === "sample" && f.info.ok).length;
+  const ss = $("#sampleStatus");
+  ss.className = "hint " + (ns ? "ok" : "");
+  ss.textContent = ns ? `✓ ${ns} numune spektrumu` : "Henüz yüklenmedi.";
   renderSamples();
   refreshRunState();
 }
-async function removeFile(id) {
+async function removeFile(id, silent) {
   const i = state.files.findIndex((f) => f.id === id);
   if (i < 0) return;
   const [f] = state.files.splice(i, 1);
   delete state.blobs[id];
   await engine.call("remove", { path: f.path });
-  renderFiles();
+  if (!silent) renderFiles();
 }
 
 /* ------------------------------------------------------------------ numune kartları */
@@ -334,7 +350,8 @@ function buildPayload() {
   return {
     project: "Gama zırhlama analizi", files, samples,
     settings: { k: +$("#optK").value, min_sig: +$("#optSig").value, variants: $("#optVar").checked,
-      exclude_lines: [...state.excluded], xcom_csv: state.xcomPath, xs_rel_unc: (+$("#optXs").value || 0) / 100 },
+      exclude_lines: [...state.excluded], xcom_csv: state.xcomPath, xs_rel_unc: (+$("#optXs").value || 0) / 100,
+      blank_scale: +$("#optScale").value || 1, blank_scale_u: (+$("#optScaleU").value || 0) / 100 },
   };
 }
 async function run() {
@@ -432,6 +449,12 @@ function summaryTab(r) {
   const wrap = h("div");
   const ti = r.thickness_implied && Object.entries(r.thickness_implied);
   wrap.append(tableTab(r.summary, null, "Veri yok."));
+  const sd = r.status && r.status.scale_diagnostic;
+  if (sd && Object.keys(sd).length) {
+    wrap.append(h("p", { class: "small" }, "Tanı – numunesiz ölçüm hızı için ortak ölçek çarpanı k (ölçülen kalınlık + kuramsal μ, ≥250 keV): " +
+      Object.entries(sd).map(([k, v]) => `${k}: ${fmtPM(v.k, v.u_k)} (χ²/ndf ${v.chi2.toFixed(1)}/${v.ndf})`).join("; ") +
+      ". k ≈ 1 değilse numunesiz ve numuneli ölçümler arasında hız farkı vardır (geometri/konum)."));
+  }
   if (ti && ti.length) wrap.append(h("p", { class: "small" }, "Veriden çıkarsanan kalınlık (kuramsal μ ile): " + ti.map(([k, v]) => `${k}: ${fmtPM(v[0], v[1])} mm`).join("; ") + ". Ölçülen kalınlıkla uyumlu olmalıdır (geometri kontrolü)."));
   return wrap;
 }
@@ -469,13 +492,23 @@ function saveBlob(blob, name) {
 }
 
 /* ------------------------------------------------------------------ olaylar */
-const drop = $("#drop"), input = $("#fileInput");
-drop.addEventListener("click", () => input.click());
-drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
-["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", (e) => addBlobs([...e.dataTransfer.files].map((f) => ({ blob: f, file: f.name }))));
-input.addEventListener("change", () => { addBlobs([...input.files].map((f) => ({ blob: f, file: f.name }))); input.value = ""; });
+function wireDrop(dropEl, inputEl, role) {
+  dropEl.addEventListener("click", () => inputEl.click());
+  dropEl.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputEl.click(); } });
+  ["dragenter", "dragover"].forEach((ev) => dropEl.addEventListener(ev, (e) => { e.preventDefault(); dropEl.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => dropEl.addEventListener(ev, (e) => { e.preventDefault(); dropEl.classList.remove("over"); }));
+  dropEl.addEventListener("drop", (e) => addBlobs([...e.dataTransfer.files].map((f) => ({ blob: f, file: f.name })), role));
+  inputEl.addEventListener("change", () => { addBlobs([...inputEl.files].map((f) => ({ blob: f, file: f.name })), role); inputEl.value = ""; });
+}
+wireDrop($("#dropBlank"), $("#fileInputBlank"), "blank");
+wireDrop($("#dropSample"), $("#fileInputSample"), "sample");
+$("#applyThick").addEventListener("click", () => {
+  const v = $("#allThick").value.trim();
+  const { bad } = parseNums(v);
+  if (!v || bad.length) { $("#allThick").focus(); return; }
+  for (const f of state.files) if (f.role === "sample") state.meta[f.id].thickness = v;
+  saveMeta(); renderSamples();
+});
 $("#clearBtn").addEventListener("click", async () => { for (const f of [...state.files]) await removeFile(f.id); $("#fileMsgs").replaceChildren(); });
 $("#demoBtn").addEventListener("click", async () => {
   const btn = $("#demoBtn"); btn.disabled = true;
@@ -483,9 +516,11 @@ $("#demoBtn").addEventListener("click", async () => {
     const items = [];
     for (const d of DEMO) {
       const r = await fetch("demo/" + d.file); if (!r.ok) throw new Error(d.file + " indirilemedi");
-      items.push({ blob: await r.blob(), file: d.file, label: d.label, meta: { density: d.density, theo_density: d.theo, composition: d.comp, composition_mode: "wt" } });
+      items.push({ blob: await r.blob(), file: d.file, label: d.label, meta: { thickness: DEMO_THICKNESS, density: d.density, theo_density: d.theo, composition: d.comp, composition_mode: "wt" } });
     }
-    await addBlobs(items);
+    const rb = await fetch("demo/" + DEMO_BLANK.file); if (!rb.ok) throw new Error(DEMO_BLANK.file + " indirilemedi");
+    await addBlobs([{ blob: await rb.blob(), file: DEMO_BLANK.file, label: DEMO_BLANK.label }], "blank");
+    await addBlobs(items, "sample");
   } catch (e) { $("#fileMsgs").append(h("div", { class: "banner err" }, e.message)); }
   btn.disabled = false;
 });

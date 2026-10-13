@@ -76,9 +76,10 @@ def model_spread(lnR_base: float, lnR_variants: list[float]) -> float:
     return 0.0
 
 
-def _ratio(l0: LineMeas, l1: LineMeas, decay: float = 1.0):
-    """ln(R0/R1) with statistical and model uncertainty; decay = factor reducing R1 (corrected R1 = R1/decay)."""
-    R0, R1 = l0.rate, l1.rate / decay
+def _ratio(l0: LineMeas, l1: LineMeas, decay: float = 1.0, scale: float = 1.0):
+    """ln(k R0/R1) with statistical and model uncertainty; decay = factor reducing R1 (corrected R1 = R1/decay);
+    scale = k, multiplier of the blank rate (geometry/flux correction, 1 = none)."""
+    R0, R1 = l0.rate * scale, l1.rate / decay
     L = math.log(R0 / R1)
     u_stat = math.hypot(l0.u_stat / abs(l0.area), l1.u_stat / abs(l1.area))
     common = [v for v in l0.variant_areas if v in l1.variant_areas]
@@ -86,7 +87,7 @@ def _ratio(l0: LineMeas, l1: LineMeas, decay: float = 1.0):
     for v in common:
         a0, a1 = l0.variant_areas[v], l1.variant_areas[v]
         if a0 > 0 and a1 > 0:
-            lv.append(math.log((a0 / l0.live_time) / (a1 / l1.live_time / decay)))
+            lv.append(math.log(scale * (a0 / l0.live_time) / (a1 / l1.live_time / decay)))
     return L, u_stat, model_spread(L, lv), len(lv)
 
 
@@ -262,12 +263,18 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
                 decay = decay_factor(l0.source, (t_samp - t_blank).total_seconds() / 86400.0)
             elif cfg.decay_correction:
                 flags.append("bozunma düzeltmesi için zaman bilgisi yok")
-            L, u_st, u_mod, nv = _ratio(l0, l1, decay)
-            u_L = math.hypot(u_st, u_mod)
+            L, u_st, u_mod, nv = _ratio(l0, l1, decay, cfg.blank_scale)
+            u_k = cfg.blank_scale_u / cfg.blank_scale if cfg.blank_scale else 0.0
+            u_L = math.sqrt(u_st**2 + u_mod**2 + u_k**2)
             T = math.exp(-L)
             row.update({"I0_cps": l0.rate, "u_I0_cps": l0.u_rate_stat, "I_cps": l1.rate / decay, "u_I_cps": l1.u_rate_stat / decay,
                         "T_I_I0": T, "u_T": T * u_L, "L_ln_I0_I": L, "u_L_ist": u_st, "u_L_model": u_mod, "u_L": u_L,
-                        "Model_varyant_sayisi": nv, "Bozunma_duzeltme_carpani": decay})
+                        "Model_varyant_sayisi": nv, "Bozunma_duzeltme_carpani": decay, "I0_olcek_carpani": cfg.blank_scale})
+            if L < -3.0 * u_L:       # more counts with the sample than without: not an attenuation measurement
+                row["Not"] = (f"I > I0 ({-L / u_L:.1f}σ): zayıflama değil; numuneden geçmeyen bileşen "
+                              "(ör. Pb X-ışını/floresans) veya geometri farkı olabilir. LAC hesaplanmadı")
+                rows.append(row)
+                continue
             rpe_v, u_rpe = ph.rpe(T, u_L)
             row.update({"RPE_yuzde": rpe_v, "u_RPE_yuzde": u_rpe, "L_anlamlilik_sigma": abs(L) / u_L if u_L else float("inf")})
             if comp and rho:
@@ -281,7 +288,7 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
                 row.update({"x_cm": x, "u_x_cm": ux, "LAC_cm-1": mu, "u_LAC_cm-1": umu,
                             "LAC_anlamlilik_sigma": abs(mu) / umu if umu else float("inf"),
                             "Katki_ist_I0": (l0.u_stat / abs(l0.area) / x), "Katki_ist_I": (l1.u_stat / abs(l1.area) / x),
-                            "Katki_model": u_mod / x, "Katki_kalinlik": abs(mu) * ux / x})
+                            "Katki_model": u_mod / x, "Katki_kalinlik": abs(mu) * ux / x, "Katki_olcek": u_k / x})
                 for nm, k in (("HVL", ph.LN2), ("TVL", ph.LN10), ("MFP", 1.0)):
                     v, u = ph.thickness_param(mu, umu, k)
                     row[f"{nm}_cm"], row[f"u_{nm}_cm"] = v, u
@@ -319,16 +326,48 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
             g = df[(df["Numune"] == sc.name)].dropna(subset=["Kalinlik_cikarsanan_mm"])
             if g.empty:
                 continue
-            w = 1.0 / g["u_Kalinlik_cikarsanan_mm"] ** 2
-            xi = float((g["Kalinlik_cikarsanan_mm"] * w).sum() / w.sum())
+            hi = g[g["E_keV"] >= 100.0]        # below 100 keV Pb X-rays / fluorescence are not transmitted photons
+            use = hi if not hi.empty else g
+            w = 1.0 / use["u_Kalinlik_cikarsanan_mm"] ** 2
+            xi = float((use["Kalinlik_cikarsanan_mm"] * w).sum() / w.sum())
             uxi = float(1.0 / np.sqrt(w.sum()))
             res.status.setdefault("thickness_implied", {})[sc.name] = (xi, uxi)
             if sc.thickness_mm:
                 xm = ph.mean_with_sem(sc.thickness_mm, sc.thickness_u_mm)
-                if abs(xi - xm.value) > 3 * math.hypot(uxi, xm.u):
+                bad, good = [], []
+                for _, r in g.iterrows():
+                    dev = (r["Kalinlik_cikarsanan_mm"] - xm.value) / math.hypot(r["u_Kalinlik_cikarsanan_mm"], xm.u)
+                    item = f"{r['Cizgi']} ({r['Kalinlik_cikarsanan_mm']:.2f} ± {r['u_Kalinlik_cikarsanan_mm']:.2f} mm)"
+                    (bad if abs(dev) > 3 else good).append(item)
+                if bad:
                     res.warnings.append(
-                        f"{sc.name}: verilerden çıkarsanan kalınlık {xi:.3g} ± {uxi:.2g} mm, ölçülen {xm.value:.3g} mm ile "
-                        "uyuşmuyor (>3σ): geometri, numune konumu veya kalınlık değerini kontrol edin.")
+                        f"{sc.name}: ölçülen kalınlık {xm.value:.3g} mm ile çizgilerden çıkarsanan kalınlık uyuşmuyor (>3σ): "
+                        + "; ".join(bad) + ("  |  uyumlu: " + "; ".join(good) if good else "") +
+                        ". Kalınlığı, numune–numunesiz geometri farkını ve ışın demetinin numuneyle tam kapandığını kontrol edin.")
+    if not df.empty and {"LAC_kuram_cm-1", "x_cm", "L_ln_I0_I"}.issubset(df.columns):
+        diag = {}
+        for name, g in df.groupby("Numune"):
+            g = g.dropna(subset=["LAC_kuram_cm-1", "x_cm", "L_ln_I0_I", "u_L"])
+            g = g[g["E_keV"] >= 250.0]
+            if len(g) < 3:
+                continue
+            y = g["L_ln_I0_I"] - g["LAC_kuram_cm-1"] * g["x_cm"]          # = ln(k_needed / k_applied) per line
+            w = 1.0 / g["u_L"] ** 2
+            m = float((y * w).sum() / w.sum())
+            chi2 = float((((y - m) ** 2) * w).sum())
+            # k such that  R0*k  reproduces the tabulated attenuation for the measured thickness
+            diag[name] = {"k": math.exp(-m) * cfg.blank_scale, "u_k": math.exp(-m) / math.sqrt(w.sum()),
+                          "chi2": chi2, "ndf": len(g) - 1}
+        if diag:
+            res.status["scale_diagnostic"] = diag
+            ks = [d["k"] for d in diag.values()]
+            if all(d["chi2"] / max(d["ndf"], 1) < 3 for d in diag.values()) and abs(np.mean(ks) - 1.0) > 0.03:
+                res.warnings.append(
+                    "Tanı: ölçülen kalınlık ve kuramsal μ ile, numunesiz ölçüm hızını ortak bir çarpanla "
+                    f"k ≈ {np.mean(ks):.3f} (numuneler arası {min(ks):.3f}–{max(ks):.3f}) ölçeklemek tüm çizgileri (≥250 keV) birlikte açıklıyor. "
+                    "Bu, numunesiz ile numuneli ölçümler arasında ≈%" f"{abs(np.mean(ks) - 1) * 100:.0f} bir hız farkına (kaynak/dedektör konumu, geometri) işaret eder. "
+                    "k'yi bağımsız ölçmeden (ör. numunesiz ölçümü numunelerden önce ve sonra tekrarlayarak) LAC'a uygulamayın; "
+                    "ölçerseniz 'I₀ ölçek çarpanı' alanına girin.")
     if not df.empty and "L_anlamlilik_sigma" in df.columns:
         for name, g in df.groupby("Numune"):
             sig = g["L_anlamlilik_sigma"].dropna()

@@ -43,7 +43,7 @@ python -m gamma_shielding config/config.yaml      # veya Windows'ta calistir.bat
 
 ## Web sürümü (tarayıcıda, sunucusuz)
 
-Aynı kod **Pyodide** ile tarayıcıda çalışır: `.Spc` dosyalarını sürükleyin, kalınlık/yoğunluk/bileşimi formdan girin,
+Aynı kod **Pyodide** ile tarayıcıda çalışır: numunesiz ölçümü ve numune `.Spc` dosyalarını ayrı alanlara sürükleyin, kalınlık (tüm numuneler için tek kutu + numune başına) / yoğunluk / bileşimi formdan girin,
 sonuçları (tablo, grafik, Excel, zip) indirin. Cloudflare Pages'e zip olarak yüklenir.
 
 ```bash
@@ -66,16 +66,16 @@ Bileşim kutusu elementleri (`Ni 0.75; Al 0.15`) ya da bileşikleri (`Dy2O3 5; S
 
 ## Doğrulama
 
-`python -m pytest tests -m "not slow"` (41 test) ve `-m slow`:
+`python -m pytest tests -m "not slow"` (43 test) ve `-m slow`:
 
 * sentetik spektrumlarda (bilinen μ) 14 tekrar × 6 çizgi: **pull ortalaması +0.01, std 0.89** → yanlılık yok, hata payları doğru/hafif muhafazakâr;
 * belirsizlik yayılımı Monte Carlo ile, Zeff (saf element → Z), kuramsal MAC (NIST: Pb, Al, H, su), çift oluşum düzeltmesi, `.Spc` okuyucu (gerçek dosyalar), yapılandırma hataları.
 
 `examples/sentetik_ornek/` **gerçek veri değildir**; nihai çıktının biçimini göstermek için sentetik spektrumlardan üretilmiştir (`python examples/make_synthetic_example.py`).
 
-## Bu veri seti için notlar
+## Bu veri seti için notlar (numunesiz ölçüm ve 3.30 mm ile)
 
-* Dedektör **NaI(Tl) benzeri** (662 keV'de FWHM ≈ %7). Tespit edilen çizgiler: Ba-133 81 / 303 / 356, Cs-137 662, Co-60 1173 / 1332 keV. **Am-241 (59.5) ve Co-57 (122) spektrumlarda görünmüyor** (net alan sıfırla uyumlu) → analiz dışı kalır.
-* **Kurşun kolimatör:** ≈47 keV (Pb-210) ve ≈92 keV omuz (Pb K X-ışını bölgesi) yardımcı bileşen olarak modellenir; 81 keV çizgisinin sonuçları bu yüzden daha yüksek model belirsizliği taşır ve kolimatör floresansı numuneden geçen ışınla aynı şekilde zayıflamaz.
-* **303 keV** çizgisi (276+303 keV) Compton zemini üzerinde zayıf; belirsizliği büyüktür.
-* `.Spc` başlığındaki tarih/saat *kaydetme* zamanı olabilir (dosyalar arası 16 dk fark var); bozunma düzeltmesi için ölçüm başlangıçlarını `baslangic:` ile elle verin.
+* Dedektör **NaI(Tl) benzeri** (662 keV'de FWHM ≈ %7). Çizgiler: Ba-133 303 / 356, Cs-137 662, Co-60 1173 / 1332 keV; **Co-57 (122 keV) görünmüyor**.
+* **≈65 keV'de güçlü bir tepe** numunesiz ölçümde var, numunelerle tamamen yok oluyor (Am-241 bölgesi; kalibrasyonumuzda 59.5 keV'in ≈5 keV üstünde göründüğünden kimliği kesin değil). **81 keV bölgesinin büyük bölümü numuneden geçmeyen Pb K X-ışınlarıdır** (T ≈ 0.89, Ba-133 81 keV fotonları için kuram 0.18): bu çizgi LAC için **kullanılmamalı**. Bölge bu bileşenlerle birlikte uydurulur (χ²/ndf ≈ 1).
+* **356 keV'de** ölçülen LAC kuramla uyumlu (Dy-0: 0.83 ± 0.09 cm⁻¹, kuram 0.77). **662–1332 keV'de** ölçülen zayıflama 3.30 mm için kuramın ≈%40–45'i. Ortak bir hız çarpanı **k ≈ 1.067 ± 0.008** (numunesiz ölçüm hızı numuneli ölçümlerden ≈%7 düşük) tüm çizgileri ≥250 keV'de açıklıyor (χ²/ndf 0.6–1.8); k=1 ile serbest kalınlık açıklamıyor. Yani sorun büyük olasılıkla numunesiz ve numuneli ölçümler arasındaki geometri/konum farkı. 3.30 mm'lik numune 1332 keV'i yalnızca ≈%10 zayıflattığından %1'lik bir hız farkı bile LAC'ı belirgin etkiler; **numunesiz ölçümü numunelerden önce ve sonra tekrarlayıp k'yi ölçmeniz** (ya da numuneleri üst üste koyup kalınlığı artırmanız) önerilir. Bağımsız ölçülen k, yapılandırmada `bos_olcum: olcek_carpani:` (web'de "I₀ ölçek çarpanı") ile uygulanır.
+* `.Spc` başlığındaki tarih/saat *kaydetme* zamanı olabilir; bozunma düzeltmesi için ölçüm başlangıçlarını `baslangic:` ile elle verin.

@@ -107,7 +107,9 @@ def _build(payload: dict):
     raw = {
         "proje": payload.get("project") or "Gama zirhlama analizi",
         "spektrum_klasoru": str(DATA_DIR), "cikti_klasoru": str(OUT_DIR),
-        "bos_olcum": {"dosya": blanks[0]["path"] if blanks else None},
+        "bos_olcum": {"dosya": blanks[0]["path"] if blanks else None,
+                      "olcek_carpani": float(st.get("blank_scale") or 1.0),
+                      "olcek_belirsizligi": float(st.get("blank_scale_u") or 0.0)},
         "kapsam_katsayisi": float(st.get("k", 1)), "min_anlamlilik": float(st.get("min_sig", 5)),
         "model_varyantlari": bool(st.get("variants", True)),
         "cizgiler_haric": list(st.get("exclude_lines", [])),

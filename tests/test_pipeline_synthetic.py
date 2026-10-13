@@ -29,6 +29,7 @@ def xs():
 
 def _one(tmp_path, xs, seed, thickness=True):
     T = {k: math.exp(-m * X_MM / 10.0) for k, m in MU_TRUE.items()}
+    T["Am-65"] = 0.004
     spectra = {"S": sy.make_spectrum("S", T, seed), BLANK_NAME: sy.make_spectrum("blank", None, seed + 10_000)}
     return run(_cfg(tmp_path, thickness), xs, spectra=spectra)
 
@@ -60,8 +61,52 @@ def test_without_blank_or_thickness_degrades_gracefully(tmp_path, xs):
 
 def test_undetected_line_is_dropped(tmp_path, xs):
     res = _one(tmp_path, xs, 5)
-    assert not any(k.startswith(("Am-241", "Co-57")) for k in res.attenuation["Cizgi"])
-    assert any("Am-241" in w and "tespit edilemeyen" in w for w in res.warnings)
+    assert not any(k.startswith("Co-57") for k in res.attenuation["Cizgi"])
+    assert any("Co-57" in w and "tespit edilemeyen" in w for w in res.warnings)
+
+
+def test_excess_counts_with_sample_are_flagged_not_converted_to_negative_lac(tmp_path, xs):
+    """A line that is *larger* with the sample (e.g. fluorescence) must not give a negative LAC / Zeff."""
+    T = {k: math.exp(-m * X_MM / 10.0) for k, m in MU_TRUE.items()}
+    T["Ba-133 356"] = 1.35
+    T["Am-65"] = 0.004
+    spectra = {"S": sy.make_spectrum("S", T, 21), BLANK_NAME: sy.make_spectrum("b", None, 22)}
+    res = run(_cfg(tmp_path), xs, spectra=spectra)
+    r = res.attenuation.set_index("Cizgi").loc["Ba-133 356"]
+    assert "I > I0" in r["Not"]
+    assert ("LAC_cm-1" not in r.index) or math.isnan(r["LAC_cm-1"])
+    ok = res.attenuation.set_index("Cizgi").loc["Cs-137 662"]
+    assert ok["LAC_cm-1"] > 0
+
+
+def test_blank_scale_factor_and_diagnostic(tmp_path, xs):
+    """Sample runs 7 % 'brighter' than the blank: the diagnostic finds k and an independently measured k removes the bias."""
+    from gamma_shielding import physics as ph
+    from gamma_shielding.composition import parse_composition
+    comp = parse_composition("Ni 0.75; Al 0.15; Bi 0.10")
+    rho, x_mm, k_true = 6.30, 3.3, 1.07
+    E = {"Ba-133 303": 295.4176, "Ba-133 356": 359.5183, "Cs-137 662": 661.657, "Co-60 1173": 1173.228, "Co-60 1332": 1332.492}
+    T = {k: k_true * math.exp(-ph.theory_point(xs, comp, e).mu_rho * rho * x_mm / 10) for k, e in E.items()}
+    T["Am-65"] = 0.004
+    T["Ba-133 81"] = 0.95
+    spectra = {"S": sy.make_spectrum("S", T, 31), BLANK_NAME: sy.make_spectrum("b", None, 32)}
+    cfg = _cfg(tmp_path)
+    cfg.samples[0].thickness_mm = [x_mm]
+    cfg.samples[0].density = [rho]
+    res = run(cfg, xs, spectra=spectra)
+    d = res.status["scale_diagnostic"]["S"]
+    assert d["k"] == pytest.approx(k_true, abs=0.04) and d["chi2"] / d["ndf"] < 3
+    assert any("Tanı" in w for w in res.warnings)
+    mu_th = ph.theory_point(xs, comp, 1332.492).mu_rho * rho
+    cfg2 = _cfg(tmp_path)
+    cfg2.samples[0].thickness_mm = [x_mm]
+    cfg2.samples[0].density = [rho]
+    cfg2.blank_scale, cfg2.blank_scale_u = k_true, 0.005
+    res2 = run(cfg2, xs, spectra=spectra)
+    r = res2.attenuation.set_index("Cizgi").loc["Co-60 1332"]
+    assert abs(r["LAC_cm-1"] - mu_th) < 3 * r["u_LAC_cm-1"]
+    r1 = res.attenuation.set_index("Cizgi").loc["Co-60 1332"]
+    assert abs(r1["LAC_cm-1"] - mu_th) > 3 * r1["u_LAC_cm-1"]           # uncorrected: clearly biased low
 
 
 @pytest.mark.slow

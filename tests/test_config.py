@@ -11,7 +11,8 @@ def test_shipped_config_loads():
     cfg = load_config(ROOT / "config" / "config.yaml")
     assert [s.name for s in cfg.samples] == ["Dy-0", "Dy-5", "Dy-10", "Dy-20"]
     assert cfg.samples[1].density == [6.3123, 6.3090, 6.3181]
-    assert cfg.samples[0].thickness_mm is None
+    assert cfg.samples[0].thickness_mm == [3.30]
+    assert cfg.blank_file == "Bos_olcum_5kaynak_2saat.Spc" and (cfg.spectra_dir / cfg.blank_file).exists()
     assert cfg.spectra_dir == ROOT / "data" / "raw"
     for s in cfg.samples:
         assert abs(sum(s.composition.values()) - 1.0) < 2e-4

@@ -92,8 +92,10 @@ def main():
 
         # ---- senaryo 1: demo veri, numunesiz ölçüm yok -------------------------------------------------
         page.click("#demoBtn")
-        page.wait_for_function("window.__gz.state.files.length === 4", timeout=60_000)
-        assert page.locator("#fileRows tr").count() == 4
+        page.wait_for_function("window.__gz.state.files.length === 5", timeout=60_000)
+        assert page.locator("#fileRows tr").count() == 5
+        assert "✓" in page.inner_text("#blankStatus") and "4 numune" in page.inner_text("#sampleStatus")
+        assert page.input_value("input[id^=thickness]") == "3.30"
         page.screenshot(path=str(tmp / "s1_files.png"), full_page=True)
         t1 = time.time()
         page.click("#runBtn")
@@ -101,12 +103,13 @@ def main():
         print(f"analiz 1 (4 spektrum): {time.time() - t1:.0f} s")
         res = page.evaluate("window.__gz.state.result")
         assert res["ok"], res
-        assert not res["has_blank"]
+        assert res["has_blank"]
+        att1 = {(r["Numune"], r["Cizgi"]): r for r in res["attenuation"]}
         areas = {(r["Spektrum"], r["Cizgi"]): r["Net_alan"] for r in res["peaks"]}
         print("Dy-0 Cs-137 662 alan:", areas[("Dy-0", "Cs-137 662")])
         page.screenshot(path=str(tmp / "s1_results.png"), full_page=True)
         banners = page.inner_text("#banners")
-        assert "Numunesiz" in banners
+        assert "Tanı" in banners and "3σ" in banners
         # tabs
         for tab in ("Pikler", "Göreli zayıflama", "Kuramsal", "Grafikler", "İndir"):
             page.click(f"#tabs button:has-text('{tab}')")
@@ -125,15 +128,23 @@ def main():
         worst = max(abs(areas[k] / nat[k] - 1) for k in nat if k in areas)
         print(f"tarayici vs yerel Python net alan farki (en kotu): {worst:.2e}")
         assert worst < 5e-3, worst
+        nat_att = {(r.Numune, r.Cizgi): r for r in native.attenuation.itertuples()}
+        k = ("Dy-0", "Co-60 1332")
+        print("Dy-0 1332 LAC web/yerel:", att1[k]["LAC_cm-1"], getattr(nat_att[k], "_7", None) if False else nat_att[k][list(native.attenuation.columns).index("LAC_cm-1") + 1])
+        assert abs(att1[k]["LAC_cm-1"] / nat_att[k][list(native.attenuation.columns).index("LAC_cm-1") + 1] - 1) < 5e-3
+        assert att1[("Dy-0", "Ba-133 81")].get("Not", "")
 
         # ---- senaryo 2: sentetik I0 + kalınlık -----------------------------------------------------------
         page.click("#clearBtn")
         page.wait_for_function("window.__gz.state.files.length === 0", timeout=30_000)
-        page.set_input_files("#fileInput", [str(tmp / "Bos_sentetik.Spc"), str(tmp / "Numune_sentetik.Spc")])
+        page.set_input_files("#fileInputBlank", str(tmp / "Bos_sentetik.Spc"))
+        page.set_input_files("#fileInputSample", str(tmp / "Numune_sentetik.Spc"))
         page.wait_for_function("window.__gz.state.files.length === 2", timeout=60_000)
         roles = page.evaluate("window.__gz.state.files.map(f => f.role)")
         assert sorted(roles) == ["blank", "sample"], roles
-        page.fill("input[id^=thickness]", "2,00; 2.01 1.99")
+        page.fill("#allThick", "2,00; 2.01 1.99")
+        page.click("#applyThick")
+        assert page.input_value("input[id^=thickness]") == "2,00; 2.01 1.99"
         page.fill("input[id^=density]", "6,36; 6,37; 6,38")
         page.fill("textarea[id^=comp]", "Ni 0.7497; Al 0.1501; Bi 0.1002")
         page.wait_for_timeout(800)

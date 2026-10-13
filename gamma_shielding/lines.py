@@ -38,14 +38,19 @@ def _group(label, source, lines_E, **kw):
 
 
 def default_regions() -> list[RegionSpec]:
-    """Baseline regions.  ``variants`` (below) give the model-dependence systematics."""
+    """Baseline regions.  ``variants`` (below) give the model-dependence systematics.
+
+    The 38-118 keV region holds four features of the lead-collimated NaI spectra seen so far:
+    Pb-210 46.5 keV, a strong ~65 keV peak that thick samples absorb completely (Am-241 59.5 keV
+    region), the 81 keV peak (Ba-133 81 keV + lead K X-rays, mostly *not* transmitted through the sample)
+    and the ~92 keV shoulder (Pb K X-rays / Th-234).  Only the 81 keV group is reported.
+    """
     pb210 = PeakSpec("Pb-210 46.5 (kolimatör)", (47.0,), (1.0,), reported=False, free_E_keV=5.0)
+    low65 = PeakSpec("~65 keV tepe (Am-241?)", (65.5,), (1.0,), reported=False, free_E_keV=6.0)
     pb_kx = PeakSpec("Pb K-X / 92 keV omuz", (92.0,), (1.0,), reported=False, free_E_keV=8.0)
     return [
-        RegionSpec("Am-241 59.5", 36, 68,
-                   (pb210, _group("Am-241 59.5", "Am-241", (59.5409,), free_E_keV=2.5)), bkg_order=1),
-        RegionSpec("Ba-133 81", 62, 118,
-                   (_group("Ba-133 81", "Ba-133", (79.6142, 80.9979)), pb_kx), bkg_order=1),
+        RegionSpec("Ba-133 81", 38, 118,
+                   (pb210, low65, _group("Ba-133 81", "Ba-133", (79.6142, 80.9979)), pb_kx), bkg_order=1),
         RegionSpec("Co-57 122", 104, 200,
                    (_group("Co-57 122", "Co-57", (122.0614, 136.4743), free_E_keV=4.0),), bkg_order=2),
         RegionSpec("Ba-133 303/356", 245, 450,

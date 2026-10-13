@@ -1,0 +1,72 @@
+# =====================================================================================
+#  Gama zirhlama otomasyonu - yapilandirma dosyasi
+#  Calistirma:   python -m gamma_shielding config/config.yaml
+#  (Bu dosyadaki yollar 'temel_klasor' icin goreli yazilir.)
+# =====================================================================================
+proje: "Dy2O3 katkili Ni-Al-Bi numuneleri - gama zirhlama parametreleri"
+temel_klasor: ..                 # bu dosyanin bulundugu klasore gore: depo ana klasoru
+spektrum_klasoru: data/raw       # .Spc dosyalarinin klasoru
+cikti_klasoru: output
+
+# ----- Numunesiz (bos) olcum: I0 -----------------------------------------------------
+# Olcumu aldiginizda dosyayi data/raw/ icine koyup asagidaki satirin basindaki # isaretini
+# kaldirin ve dosya adini yazin. Tanimli degilse LAC/MAC/HVL... HESAPLANMAZ (yalnizca pikler).
+bos_olcum:
+  dosya: null                    # ornek: Bos_5kaynak_2saat.Spc
+  baslangic: null                # istege bagli, bozunma duzeltmesi icin: "2026-10-13 08:00"
+
+# ----- Genel ayarlar -----------------------------------------------------------------
+kapsam_katsayisi: 1              # tablolardaki +/- degerleri: 1 = 1 sigma (%68), 2 = %95
+min_anlamlilik: 5                # net alan/belirsizlik bundan kucukse cizgi "tespit edilemedi"
+model_varyantlari: true          # fon/pencere secimi kaynakli model belirsizligini hesapla
+cizgiler_haric: []               # ornek: ["Ba-133 303"] (analizden cikarilacak cizgiler)
+bozunma_duzeltmesi:              # kaynak yarilanma omru duzeltmesi (olcumler arasi gun farki buyukse)
+  etkin: false
+  baslik_zamani_kullan: false    # dosya basligindaki zaman damgasi (kaydetme zamani olabilir!)
+tesir_kesiti_goreli_belirsizlik: 0.0   # tablo verisi icin goreli belirsizlik (ornek 0.01); 0 = yok sayilir
+# xcom_csv: data/xcom_elementler.csv   # NIST XCOM elementel degerleri (element,energy_keV,mu_rho_cm2_g)
+
+# ----- Kalibrasyon -------------------------------------------------------------------
+# Varsayilan: Ba-133/Cs-137/Co-60 tepelerinden her spektrum icin ayri otomatik kalibrasyon.
+kalibrasyon:
+  derece: null                   # null = otomatik (>=4 tepe varsa 2. derece)
+  katsayilar: null               # elle: [c0, c1, c2]  ->  E[keV] = c0 + c1*kanal + c2*kanal^2
+
+# ----- Numuneler ---------------------------------------------------------------------
+# kalinlik_mm        : mikrometre/kumpas okumalari (tek sayi ya da liste). BILINMIYORSA null birakin.
+# kalinlik_belirsizlik_mm : olcu aletinin standart belirsizligi (okumalarin ortalamasinin
+#                      standart hatasina karesel eklenir).
+# yogunluk_g_cm3     : deneysel yogunluk (tekrar olcumleri; ortalama +/- standart hata alinir)
+# bilesim_agirlik    : agirlik kesirleri (toplam ~1; otomatik normalize edilir)
+numuneler:
+  - ad: Dy-0
+    dosya: Dy2O3_00_5kaynak_2saat.Spc
+    kalinlik_mm: null
+    kalinlik_belirsizlik_mm: 0.01
+    yogunluk_g_cm3: [6.3748, 6.3794, 6.3459]
+    kuramsal_yogunluk_g_cm3: 6.66
+    bilesim_agirlik: {Ni: 0.7497, Al: 0.1501, Bi: 0.1002, Dy: 0.0000, O: 0.0000}
+
+  - ad: Dy-5
+    dosya: Dy2O3_05_5kaynak_2saat.Spc
+    kalinlik_mm: null
+    kalinlik_belirsizlik_mm: 0.01
+    yogunluk_g_cm3: [6.3123, 6.3090, 6.3181]
+    kuramsal_yogunluk_g_cm3: 6.63
+    bilesim_agirlik: {Ni: 0.6999, Al: 0.1498, Bi: 0.1002, Dy: 0.0437, O: 0.0065}
+
+  - ad: Dy-10
+    dosya: Dy2O3_10_5kaynak_2saat.Spc
+    kalinlik_mm: null
+    kalinlik_belirsizlik_mm: 0.01
+    yogunluk_g_cm3: [6.2684, 6.2597, 6.2975]
+    kuramsal_yogunluk_g_cm3: 6.59
+    bilesim_agirlik: {Ni: 0.6495, Al: 0.1501, Bi: 0.1002, Dy: 0.0873, O: 0.0129}
+
+  - ad: Dy-20
+    dosya: Dy2O3_20_5kaynak_2saat.Spc
+    kalinlik_mm: null
+    kalinlik_belirsizlik_mm: 0.01
+    yogunluk_g_cm3: [6.2435, 6.2984, 6.3006]
+    kuramsal_yogunluk_g_cm3: 6.53
+    bilesim_agirlik: {Ni: 0.5498, Al: 0.1501, Bi: 0.1002, Dy: 0.1742, O: 0.0257}

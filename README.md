@@ -48,7 +48,7 @@ sonuçları (tablo, grafik, Excel, zip) indirin. Cloudflare Pages'e zip olarak y
 
 ```bash
 python tools/build_web.py                  # dist/gama-zirhlama-web.zip  (1.7 MB, Pyodide CDN'den)
-python tools/vendor_pyodide.py <pyodide>   # dist/gama-zirhlama-web-tam.zip (41 MB, dış bağımlılık yok)
+python tools/vendor_pyodide.py <pyodide>   # dist/gama-zirhlama-web-tam.zip (41 MB, isteğe bağlı: dış bağımlılık yok)
 ```
 Yayınlama adımları: [`web/YAYINLA.md`](web/YAYINLA.md). Tarayıcı sonuçları yerel Python ile
 karşılaştırılarak doğrulanmıştır (net alan farkı < 2×10⁻⁴; `tests/e2e_web.py`).

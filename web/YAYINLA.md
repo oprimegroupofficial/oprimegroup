@@ -6,12 +6,13 @@ tarayıcısında çalışır, dosyalar bilgisayardan dışarı çıkmaz. Bu yüz
 
 ## Hangi zip?
 
-| Dosya | Boyut | Ne zaman |
+| Dosya | Boyut | Not |
 |---|---|---|
-| **`gama-zirhlama-web-tam.zip`** (önerilen) | ≈41 MB | Her şey içinde; dış siteye (CDN) bağımlı değil. |
-| `gama-zirhlama-web.zip` | ≈1.7 MB | Pyodide'ı jsDelivr CDN'den çeker (ziyaretçinin internet erişimi gerekir). |
+| **`gama-zirhlama-web.zip`** (önerilen) | ≈1.7 MB | Pyodide'ı resmî jsDelivr CDN'inden (`cdn.jsdelivr.net/pyodide/v0.27.7/`) çeker; ziyaretçinin internet erişimi gerekir. |
+| `gama-zirhlama-web-tam.zip` (isteğe bağlı) | ≈41 MB | Pyodide dosyaları içinde; hiçbir dış siteye bağımlı değil. Depoda tutulmaz; aşağıdaki "yeniden üretme" ile oluşturulur. |
 
-İkisi de aynı arayüzdür. Önce "tam" olanı yükleyin.
+İkisi de aynı arayüzdür; site kendi `pyodide/` klasörünü bulursa onu, bulamazsa CDN'i kullanır.
+CDN'e erişilemezse sayfa "Hesaplama motoru yüklenemedi" uyarısı gösterir; o durumda tam sürümü kullanın.
 
 ## Adımlar (Cloudflare Pages – Direct Upload)
 

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Gama Zırhlama Analizi</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="grow">
+      <h1>Gama Zırhlama Analizi</h1>
+      <p>.Spc spektrumlarından LAC, MAC, HVL, TVL, MFP, RPE, Zeff, Neff – tam hata payıyla. Dosyalarınız bilgisayarınızdan çıkmaz; hesaplama tarayıcınızda yapılır.</p>
+    </div>
+    <div style="min-width:260px">
+      <span class="chip" id="engineChip"><span class="dot"></span><span id="engineText">Hesaplama motoru yükleniyor…</span></span>
+      <div class="bar" style="margin-top:8px"><i id="engineBar"></i></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" id="s1">
+    <h2><span class="n">1</span> Spektrum dosyaları</h2>
+    <p class="sub">Numune spektrumlarını ve (varsa) numunesiz ölçümü (I₀) yükleyin. Dosya adında “bos / blank / numunesiz” geçenler otomatik I₀ sayılır; rolü değiştirebilirsiniz.</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Spektrum dosyalarını seç">
+      <strong>.Spc dosyalarını buraya sürükleyin</strong> ya da tıklayıp seçin
+      <input type="file" id="fileInput" accept=".spc,.Spc,.SPC" multiple hidden>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="demoBtn" type="button">Örnek veriyi yükle (Dy₂O₃ serisi)</button>
+      <button id="clearBtn" type="button" class="danger" hidden>Hepsini kaldır</button>
+      <span class="small">Dosyalar sunucuya gönderilmez.</span>
+    </div>
+    <div id="fileTableWrap" class="tw" style="margin-top:12px" hidden>
+      <table><thead><tr><th>Dosya</th><th>Toplam sayım</th><th>Canlı süre (s)</th><th>Ölü zaman</th><th>Rol</th><th>Ad</th><th></th></tr></thead>
+        <tbody id="fileRows"></tbody></table>
+    </div>
+    <div id="fileMsgs"></div>
+  </section>
+
+  <section class="card" id="s2" hidden>
+    <h2><span class="n">2</span> Numune bilgileri</h2>
+    <p class="sub">Her numune için ölçtüğünüz değerleri girin. Okumaları boşluk veya “;” ile ayırın (ondalık için nokta ya da virgül). Boş bırakılan alanlara bağlı büyüklükler hesaplanmaz; neyin eksik olduğu sonuçlarda belirtilir.</p>
+    <div class="samples" id="samples"></div>
+  </section>
+
+  <section class="card" id="s3">
+    <h2><span class="n">3</span> Ayarlar</h2>
+    <details>
+      <summary>Gelişmiş ayarlar</summary>
+      <div class="grid" style="margin-top:12px">
+        <div><label for="optK">Belirsizlik kapsamı</label>
+          <select id="optK"><option value="1">k = 1 (1σ, %68)</option><option value="2">k = 2 (≈%95)</option></select></div>
+        <div><label for="optSig">Çizgi tespit eşiği (σ)</label><input id="optSig" type="number" min="1" max="50" step="0.5" value="5"></div>
+        <div><label for="optXs">Tesir kesiti belirsizliği (%)</label><input id="optXs" type="number" min="0" max="10" step="0.1" value="0"></div>
+        <div class="wide"><label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-weight:500">
+          <input type="checkbox" id="optVar" checked style="width:auto"> Model belirsizliğini hesapla (fon/pencere varyantları; önerilir, hesabı ~8 kat uzatır)</label></div>
+        <div class="wide"><label>Analiz dışı bırakılacak çizgiler</label><div class="lines" id="lineList"><span class="small">Motor yüklenince görünür</span></div></div>
+        <div class="wide"><label for="xcomFile">İsteğe bağlı: XCOM elementel değerleri (CSV: element,energy_keV,mu_rho_cm2_g)</label>
+          <input type="file" id="xcomFile" accept=".csv,text/csv"><div class="hint" id="xcomHint">Yüklenmezse yerleşik EPDL97 tablosu kullanılır (XCOM ile tipik %1–2 fark).</div></div>
+        <div class="wide row"><button type="button" id="exportBtn">Ayarları dışa aktar (JSON)</button>
+          <button type="button" id="importBtn">İçe aktar…</button><input type="file" id="importFile" accept=".json" hidden>
+          <span class="small">Numune bilgileri bu tarayıcıda otomatik hatırlanır.</span></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card" id="s4">
+    <h2><span class="n">4</span> Analiz</h2>
+    <div class="row">
+      <button class="primary" id="runBtn" type="button" disabled>Analizi çalıştır</button>
+      <button id="cancelBtn" type="button" class="danger" hidden>İptal</button>
+      <span class="small" id="runHint">Önce en az bir numune spektrumu yükleyin.</span>
+    </div>
+    <div id="runProg" hidden style="margin-top:12px">
+      <div class="bar"><i id="runBar"></i></div>
+      <div class="small" id="runText" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <section class="card" id="results" hidden>
+    <h2>Sonuçlar</h2>
+    <div id="banners"></div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div id="tabBody"></div>
+  </section>
+</main>
+
+<div class="wrap"><footer>
+  Hesaplama: Python (numpy/scipy) Pyodide ile tarayıcıda çalışır; ilk açılışta ~40 MB kütüphane indirilir, sonra önbellekten gelir.
+  Kuramsal tesir kesitleri EPDL97 (XCOM ailesi). Yöntem ve doğrulama ayrıntıları indirilen <span class="mono">rapor.md</span> içindedir.
+</footer></div>
+<dialog id="imgDlg"><img id="imgBig" alt=""></dialog>
+<script src="app.js"></script>
+</body>
+</html>

@@ -51,7 +51,7 @@ def _find_spc(cfg: Config, fname: str) -> Path:
     low = {q.name.lower(): q for q in cfg.spectra_dir.glob("*") if q.is_file()} if cfg.spectra_dir.exists() else {}
     if p.name.lower() in low:
         return low[p.name.lower()]
-    raise FileNotFoundError(f"spektrum dosyasi bulunamadi: {fname} (aranan klasor: {cfg.spectra_dir})")
+    raise FileNotFoundError(f"spektrum dosyası bulunamadı: {fname} (aranan klasör: {cfg.spectra_dir})")
 
 
 def _mid_time(spec: Spectrum, start):
@@ -100,14 +100,20 @@ def load_spectra(cfg: Config, res: Results) -> dict[str, Spectrum]:
         try:
             spectra[BLANK_NAME] = read_spc(_find_spc(cfg, cfg.blank_file))
         except FileNotFoundError as exc:
-            res.warnings.append(f"Numunesiz (bos) olcum bulunamadi: {exc}. LAC hesaplanamaz; yalnizca pik tablosu uretildi.")
+            res.warnings.append(f"Numunesiz (boş) ölçüm bulunamadı: {exc}. LAC hesaplanamaz; yalnızca pik tablosu üretildi.")
     return spectra
 
 
-def analyze_all(cfg: Config, res: Results, spectra: dict[str, Spectrum]):
+def _p(progress, msg: str, frac: float):
+    if progress:
+        progress(msg, float(frac))
+
+
+def analyze_all(cfg: Config, res: Results, spectra: dict[str, Spectrum], progress=None):
     regions = cfg.regions or default_regions()
     res.blank_name = BLANK_NAME if BLANK_NAME in spectra else None
-    for name, spec in spectra.items():
+    for i, (name, spec) in enumerate(spectra.items()):
+        _p(progress, f"Spektrum analiz ediliyor: {name} ({i + 1}/{len(spectra)})", 0.05 + 0.75 * i / len(spectra))
         res.spectra[name] = spec
         a = analyze_spectrum(spec, regions, anchors=cfg.anchors, calibration_order=cfg.calibration_order,
                              manual_coeffs=cfg.calibration_coeffs, with_variants=cfg.variants)
@@ -116,7 +122,7 @@ def analyze_all(cfg: Config, res: Results, spectra: dict[str, Spectrum]):
         res.analyses[name] = a
         res.warnings += a.warnings
         if spec.dead_time_fraction > 0.30:
-            res.warnings.append(f"{name}: olu zaman %{100*spec.dead_time_fraction:.0f}; sayim hizi yuksek, olu zaman duzeltmesi guvenilir olmayabilir.")
+            res.warnings.append(f"{name}: ölü zaman %{100*spec.dead_time_fraction:.0f}; sayım hızı yüksek, ölü zaman düzeltmesi güvenilir olmayabilir.")
 
 
 def detected_lines(cfg: Config, res: Results) -> dict[str, float]:
@@ -182,9 +188,9 @@ def relative_table(cfg: Config, res: Results):
         big = res.relative.groupby("Numune")["Anlamlilik_sigma"].max()
         if (big < 3.0).all():
             res.warnings.append(
-                f"'{ref}' referansina gore hicbir numunede hicbir cizgide 3 sigma'yi asan fark yok: spektrumlar "
-                "istatistiksel olarak ayirt edilemiyor. Numunenin isin yolunda oldugundan ve kalinligin yeterli "
-                "oldugundan emin olun (numunesiz olcumle karsilastirinca netlesir).")
+                f"'{ref}' referansına göre hiçbir numunede hiçbir çizgide 3σ'yı aşan fark yok: spektrumlar "
+                "istatistiksel olarak ayırt edilemiyor. Numunenin ışın yolunda olduğundan ve kalınlığın yeterli "
+                "olduğundan emin olun (numunesiz ölçümle karşılaştırınca netleşir).")
 
 
 def theory_tables(cfg: Config, res: Results, xs: CrossSections):
@@ -206,7 +212,7 @@ def theory_tables(cfg: Config, res: Results, xs: CrossSections):
         comp = ph.normalize_composition(s.composition)
         wsum = sum(v for v in s.composition.values())
         if abs(wsum - 1.0) > 0.01 and abs(wsum - 100.0) > 1.0:
-            res.warnings.append(f"{s.name}: bilesim agirlik kesirlerinin toplami {wsum:.4f}; 1'e normalize edildi.")
+            res.warnings.append(f"{s.name}: bileşim ağırlık kesirlerinin toplamı {wsum:.4f}; 1'e normalize edildi.")
         for key, E in sorted(energies.items(), key=lambda kv: kv[1]):
             tp = ph.theory_point(xs, comp, E)
             r = {"Numune": s.name, "Cizgi": key, "E_keV": E, "MAC_kuram_cm2_g": tp.mu_rho,
@@ -248,14 +254,14 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
             row = {"Numune": s.name, "Cizgi": key, "Kaynak": l0.source, "E_keV": l0.E_eff}
             flags = []
             if min(l0.significance, l1.significance) < cfg.min_significance or l0.area <= 0 or l1.area <= 0:
-                row["Not"] = (f"tespit edilemedi (I0: {l0.significance:.1f} sigma, I: {l1.significance:.1f} sigma)")
+                row["Not"] = (f"tespit edilemedi (I0: {l0.significance:.1f}σ, I: {l1.significance:.1f}σ)")
                 rows.append(row)
                 continue
             decay = 1.0
             if cfg.decay_correction and t_blank and t_samp and l0.source in SOURCES:
                 decay = decay_factor(l0.source, (t_samp - t_blank).total_seconds() / 86400.0)
             elif cfg.decay_correction:
-                flags.append("bozunma duzeltmesi icin zaman bilgisi yok")
+                flags.append("bozunma düzeltmesi için zaman bilgisi yok")
             L, u_st, u_mod, nv = _ratio(l0, l1, decay)
             u_L = math.hypot(u_st, u_mod)
             T = math.exp(-L)
@@ -280,7 +286,7 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
                     v, u = ph.thickness_param(mu, umu, k)
                     row[f"{nm}_cm"], row[f"u_{nm}_cm"] = v, u
                 if mu <= 0 or abs(mu) / umu < 3:
-                    flags.append("LAC < 3 sigma: HVL/TVL/MFP guvenilir degil" if mu > 0 else "LAC <= 0: I >= I0")
+                    flags.append("LAC < 3σ: HVL/TVL/MFP güvenilir değil" if mu > 0 else "LAC ≤ 0: I ≥ I0")
                 if rho:
                     m, um_ = ph.mac(mu, umu, rho.value, rho.u)
                     row.update({"rho_g_cm3": rho.value, "u_rho_g_cm3": rho.u, "MAC_cm2_g": m, "u_MAC_cm2_g": um_})
@@ -300,9 +306,9 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
                                     "Sapma_MAC_yuzde": 100 * (m - mu_t_rho) / mu_t_rho,
                                     "u_Sapma_MAC_yuzde": 100 * math.hypot(um_ / mu_t_rho, m * urel / mu_t_rho)})
                 else:
-                    flags.append("yogunluk yok: MAC/Zeff/Neff hesaplanamadi")
+                    flags.append("yoğunluk yok: MAC/Zeff/Neff hesaplanamadı")
             else:
-                flags.append("kalinlik yok: LAC/MAC/HVL/TVL/MFP/Zeff hesaplanamadi")
+                flags.append("kalınlık yok: LAC/MAC/HVL/TVL/MFP/Zeff hesaplanamadı")
             if flags:
                 row["Not"] = "; ".join(flags)
             rows.append(row)
@@ -321,41 +327,46 @@ def attenuation_table(cfg: Config, res: Results, xs: CrossSections):
                 xm = ph.mean_with_sem(sc.thickness_mm, sc.thickness_u_mm)
                 if abs(xi - xm.value) > 3 * math.hypot(uxi, xm.u):
                     res.warnings.append(
-                        f"{sc.name}: verilerden cikarsanan kalinlik {xi:.3g} ± {uxi:.2g} mm, olculen {xm.value:.3g} mm ile "
-                        "uyusmuyor (>3 sigma): geometri, numune konumu veya kalinlik degerini kontrol edin.")
+                        f"{sc.name}: verilerden çıkarsanan kalınlık {xi:.3g} ± {uxi:.2g} mm, ölçülen {xm.value:.3g} mm ile "
+                        "uyuşmuyor (>3σ): geometri, numune konumu veya kalınlık değerini kontrol edin.")
     if not df.empty and "L_anlamlilik_sigma" in df.columns:
         for name, g in df.groupby("Numune"):
             sig = g["L_anlamlilik_sigma"].dropna()
             if len(sig) and (sig < 3.0).all():
                 res.warnings.append(
-                    f"{name}: numunesiz olcume gore hicbir cizgide 3 sigma'yi asan zayiflama yok; "
-                    "numune isin yolunda mi / kalinlik yeterli mi kontrol edin. Hesaplanan LAC degerleri belirsiz.")
+                    f"{name}: numunesiz ölçüme göre hiçbir çizgide 3σ'yı aşan zayıflama yok; "
+                    "numune ışın yolunda mı / kalınlık yeterli mi kontrol edin. Hesaplanan LAC değerleri belirsiz.")
 
 
-def run(cfg: Config, xs: CrossSections | None = None, spectra: dict[str, Spectrum] | None = None) -> Results:
-    """Run the whole analysis.  ``spectra`` (name -> Spectrum, blank under BLANK_NAME) bypasses file reading."""
+def run(cfg: Config, xs: CrossSections | None = None, spectra: dict[str, Spectrum] | None = None,
+        progress=None) -> Results:
+    """Run the whole analysis.  ``spectra`` (name -> Spectrum, blank under BLANK_NAME) bypasses file reading.
+    ``progress(message, fraction)`` is called between stages (used by the browser version)."""
     res = Results(cfg)
-    analyze_all(cfg, res, spectra if spectra is not None else load_spectra(cfg, res))
+    _p(progress, "Dosyalar okunuyor", 0.02)
+    analyze_all(cfg, res, spectra if spectra is not None else load_spectra(cfg, res), progress)
+    _p(progress, "Tablolar hazırlanıyor", 0.82)
     build_tables(cfg, res)
     relative_table(cfg, res)
     xs = xs or CrossSections(cfg.xs_csv)
     theory_tables(cfg, res, xs)
+    _p(progress, "Zırhlama parametreleri hesaplanıyor", 0.88)
     attenuation_table(cfg, res, xs)
     nd = {}
     for a in res.analyses.values():
         for key, L in a.lines.items():
             nd[key] = max(nd.get(key, 0.0), L.significance if L.fit_ok else 0.0)
-    missing = [f"{k} (en yuksek {v:.1f} sigma)" for k, v in nd.items() if v < cfg.min_significance]
+    missing = [f"{k} (en yüksek {v:.1f}σ)" for k, v in nd.items() if v < cfg.min_significance]
     if missing:
-        res.warnings.append("Spektrumlarda tespit edilemeyen cizgiler (analiz disi birakildi): " + "; ".join(missing))
+        res.warnings.append("Spektrumlarda tespit edilemeyen çizgiler (analiz dışı bırakıldı): " + "; ".join(missing))
     res.status.update({
         "blank": bool(res.blank_name),
         "thickness_all": all(s.thickness_mm for s in cfg.samples),
         "density_all": all(s.density for s in cfg.samples),
         "composition_all": all(s.composition for s in cfg.samples)})
     if not res.status["blank"]:
-        res.warnings.append("Numunesiz (I0) spektrum tanimli degil: LAC/MAC/HVL/TVL/MFP/RPE/Zeff/Neff hesaplanmadi.")
+        res.warnings.append("Numunesiz (I0) spektrum tanımlı değil: LAC/MAC/HVL/TVL/MFP/RPE/Zeff/Neff hesaplanmadı.")
     elif not res.status["thickness_all"]:
         miss = [s.name for s in cfg.samples if not s.thickness_mm]
-        res.warnings.append("Kalinlik girilmemis numuneler: " + ", ".join(miss) + " (LAC icin 'kalinlik_mm' gerekli).")
+        res.warnings.append("Kalınlık girilmemiş numuneler: " + ", ".join(miss) + " (LAC için kalınlık gerekli).")
     return res

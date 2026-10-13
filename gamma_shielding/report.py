@@ -321,8 +321,10 @@ def write_markdown(res: Results, path: Path):
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
-def write_all(res: Results, xs: CrossSections) -> Path:
+def write_all(res: Results, xs: CrossSections, progress=None) -> Path:
     out = res.cfg.out_dir
+    if progress:
+        progress("Excel, rapor ve grafikler yazılıyor", 0.92)
     (out / "grafikler").mkdir(parents=True, exist_ok=True)
     write_excel(res, out / "sonuclar.xlsx")
     write_csvs(res, out / "csv")

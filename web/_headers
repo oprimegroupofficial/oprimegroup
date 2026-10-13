@@ -1,0 +1,7 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+/wheels/*
+  Cache-Control: public, max-age=86400
+/demo/*
+  Cache-Control: public, max-age=86400

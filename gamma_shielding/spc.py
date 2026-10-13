@@ -95,24 +95,29 @@ def _parse_datetime(date_txt: str, time_txt: str, century_digit: str) -> datetim
 
 def read_spc(path: str | Path) -> Spectrum:
     path = Path(path)
-    buf = path.read_bytes()
+    return parse_spc(path.read_bytes(), path.stem, str(path))
+
+
+def parse_spc(buf: bytes, fallback_name: str = "spektrum", source_file: str = "") -> Spectrum:
+    """Parse the bytes of an ORTEC .Spc file (used by the browser version too)."""
+    path = Path(source_file or fallback_name)
     if len(buf) < 4 * RECORD:
-        raise SpcFormatError(f"{path.name}: file too small for an .Spc spectrum")
+        raise SpcFormatError(f"{path.name}: dosya bir .Spc spektrumu için çok küçük")
 
     rec_size = struct.unpack_from("<H", buf, 62)[0]
     first_rec = struct.unpack_from("<H", buf, 60)[0]
     n_ch = struct.unpack_from("<i", buf, 64)[0]
     if rec_size != RECORD or not (16 <= n_ch <= 65536) or first_rec < 2:
         raise SpcFormatError(
-            f"{path.name}: unexpected header (record size {rec_size}, channels {n_ch}, "
-            f"data record {first_rec}); is this an ORTEC .Spc file?")
+            f"{path.name}: beklenmeyen başlık (kayıt boyu {rec_size}, kanal {n_ch}, "
+            f"veri kaydı {first_rec}); bu bir ORTEC .Spc dosyası mı?")
     offset = (first_rec - 1) * RECORD
     if offset + 4 * n_ch > len(buf):
-        raise SpcFormatError(f"{path.name}: file is shorter than the declared {n_ch} channels")
+        raise SpcFormatError(f"{path.name}: dosya bildirilen {n_ch} kanaldan kısa")
 
     counts = np.frombuffer(buf, dtype="<i4", count=n_ch, offset=offset).astype(np.int64)
     if counts.min() < 0:
-        raise SpcFormatError(f"{path.name}: negative counts found - wrong data offset?")
+        raise SpcFormatError(f"{path.name}: negatif sayım bulundu - veri konumu yanlış olabilir")
 
     real_time = struct.unpack_from("<f", buf, 90)[0]
     live_time = struct.unpack_from("<f", buf, 94)[0]
@@ -134,7 +139,7 @@ def read_spc(path: str | Path) -> Spectrum:
 
     health = _text(buf, 2432, 256)
     long_name = _text(buf, 768, 40)
-    stem = Path(long_name).stem if long_name else path.stem
+    stem = Path(long_name.replace('\\', '/')).stem if long_name else Path(fallback_name).stem
     meta = {
         "short_name": _text(buf, 256, 16),
         "long_name": long_name,
@@ -144,4 +149,4 @@ def read_spc(path: str | Path) -> Spectrum:
     return Spectrum(
         name=stem, counts=counts, live_time=float(live_time), real_time=float(real_time),
         start=start, header_calibration=(c0, c1, c2), header_rois=rois,
-        description=_text(buf, 512, 80), source_file=str(path), meta=meta)
+        description=_text(buf, 512, 80), source_file=source_file, meta=meta)

@@ -32,3 +32,18 @@ def test_rejects_non_spc(tmp_path):
     q.write_bytes(b"abc")
     with pytest.raises(SpcFormatError):
         read_spc(q)
+
+
+def test_writer_reader_roundtrip():
+    from datetime import datetime
+
+    from gamma_shielding.spc import parse_spc
+    from spc_writer import spc_bytes
+
+    counts = np.arange(4096) % 977
+    raw = spc_bytes(counts, 7200.0, 7380.5, name="Blank_x", start=datetime(2026, 3, 4, 5, 6, 7), cal=(-1.0, 0.5, 1e-5))
+    s = parse_spc(raw, "fallback")
+    assert np.array_equal(s.counts, counts)
+    assert s.live_time == pytest.approx(7200.0) and s.real_time == pytest.approx(7380.5, abs=0.01)
+    assert s.name == "Blank_x" and s.start == datetime(2026, 3, 4, 5, 6, 7)
+    assert s.header_calibration[1] == pytest.approx(0.5)

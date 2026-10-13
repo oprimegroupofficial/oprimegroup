@@ -39,7 +39,7 @@ def _group(label, source, lines_E, **kw):
 
 def default_regions() -> list[RegionSpec]:
     """Baseline regions.  ``variants`` (below) give the model-dependence systematics."""
-    pb210 = PeakSpec("Pb-210 46.5 (kolimator)", (47.0,), (1.0,), reported=False, free_E_keV=5.0)
+    pb210 = PeakSpec("Pb-210 46.5 (kolimatör)", (47.0,), (1.0,), reported=False, free_E_keV=5.0)
     pb_kx = PeakSpec("Pb K-X / 92 keV omuz", (92.0,), (1.0,), reported=False, free_E_keV=8.0)
     return [
         RegionSpec("Am-241 59.5", 36, 68,

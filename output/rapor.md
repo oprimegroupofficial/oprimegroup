@@ -108,9 +108,9 @@ Referans: **Dy-0**. T = I/I_ref; ±: istatistik ⊕ model. (Bu tablo LAC değild
 
 ## 7. Uyarılar
 
-- 'Dy-0' referansina gore hicbir numunede hicbir cizgide 3 sigma'yi asan fark yok: spektrumlar istatistiksel olarak ayirt edilemiyor. Numunenin isin yolunda oldugundan ve kalinligin yeterli oldugundan emin olun (numunesiz olcumle karsilastirinca netlesir).
-- Spektrumlarda tespit edilemeyen cizgiler (analiz disi birakildi): Am-241 59.5 (en yuksek 2.2 sigma); Co-57 122 (en yuksek 2.1 sigma)
-- Numunesiz (I0) spektrum tanimli degil: LAC/MAC/HVL/TVL/MFP/RPE/Zeff/Neff hesaplanmadi.
+- 'Dy-0' referansına göre hiçbir numunede hiçbir çizgide 3σ'yı aşan fark yok: spektrumlar istatistiksel olarak ayırt edilemiyor. Numunenin ışın yolunda olduğundan ve kalınlığın yeterli olduğundan emin olun (numunesiz ölçümle karşılaştırınca netleşir).
+- Spektrumlarda tespit edilemeyen çizgiler (analiz dışı bırakıldı): Am-241 59.5 (en yüksek 2.2σ); Co-57 122 (en yüksek 2.1σ)
+- Numunesiz (I0) spektrum tanımlı değil: LAC/MAC/HVL/TVL/MFP/RPE/Zeff/Neff hesaplanmadı.
 
 ## 8. Yöntem
 

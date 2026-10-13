@@ -55,7 +55,7 @@ def test_without_blank_or_thickness_degrades_gracefully(tmp_path, xs):
     assert any("Numunesiz" in w for w in res.warnings)
     res2 = _one(tmp_path, xs, 2, thickness=False)
     assert "LAC_cm-1" not in res2.attenuation.columns
-    assert res2.attenuation["Not"].str.contains("kalinlik yok").all()
+    assert res2.attenuation["Not"].str.contains("kalınlık yok").all()
 
 
 def test_undetected_line_is_dropped(tmp_path, xs):
@@ -94,4 +94,4 @@ def test_implied_thickness_matches_truth_when_theory_is_consistent(tmp_path, xs)
     xi, uxi = res.status["thickness_implied"]["S"]
     # _cfg declares a measured thickness of 5 mm, the data imply 0.5 mm -> must be flagged
     assert xi == pytest.approx(0.5, abs=max(3 * uxi, 0.05))
-    assert any("uyusmuyor" in w for w in res.warnings)     # measured 5 mm vs implied 0.5 mm must be flagged
+    assert any("uyuşmuyor" in w for w in res.warnings)     # measured 5 mm vs implied 0.5 mm must be flagged

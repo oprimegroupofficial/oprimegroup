@@ -1,7 +1,7 @@
 """Photon mass attenuation coefficients of elements and mixtures.
 
-Default backend: ``fisx`` (EPDL97 / Livermore evaluated photon data, the same family of
-data XCOM is built on).  Differences to NIST XCOM are typically below 1-2 % in the
+Data: EPDL97 / Livermore evaluated photon data (the same family XCOM is built on), shipped as a
+precomputed table (``data/elements_xs.npz``, made with ``tools/make_xs_table.py`` from ``fisx``).  Differences to NIST XCOM are typically below 1-2 % in the
 0.05-2 MeV range.  If you need XCOM exactly, supply a CSV with columns
 ``element,energy_keV,mu_rho_cm2_g`` (elemental XCOM totals incl. coherent scattering);
 it overrides the built-in values for the elements/energies it covers (log-log
@@ -50,20 +50,39 @@ def _loglog(x, xs, ys):
     return np.exp(np.interp(np.log(x), np.log(xs), np.log(ys)))
 
 
-class CrossSections:
-    """Elemental photon cross sections in cm^2/g at arbitrary energies (keV)."""
+TABLE_FILE = Path(__file__).parent / "data" / "elements_xs.npz"
 
-    def __init__(self, override_csv: str | Path | None = None):
-        try:
-            import fisx
-        except ImportError as exc:  # pragma: no cover
-            raise ImportError("fisx paketi gerekli: pip install fisx") from exc
-        self._el = fisx.Elements()
-        self._el.initializeAsPyMca()
+
+class CrossSections:
+    """Elemental photon cross sections in cm^2/g at arbitrary energies (keV).
+
+    backend="table" (default when ``data/elements_xs.npz`` exists): precomputed EPDL97 totals,
+    log-log interpolated - no extra dependency, also used by the browser version.
+    backend="fisx": compute directly (needs ``pip install fisx``); gives the partial processes.
+    """
+
+    def __init__(self, override_csv: str | Path | None = None, backend: str = "auto"):
+        if backend == "auto":
+            backend = "table" if TABLE_FILE.exists() else "fisx"
+        self.backend = backend
         self._override: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        self._pair_ref: dict[str, float] = {}
+        if backend == "table":
+            d = np.load(TABLE_FILE)
+            self._grid = d["energies_keV"].astype(float)
+            self._tab = d["total_cm2_g"].astype(float)
+            self._row = {str(s): i for i, s in enumerate(d["symbols"])}
+        elif backend == "fisx":
+            try:
+                import fisx
+            except ImportError as exc:  # pragma: no cover
+                raise ImportError("fisx paketi gerekli: pip install fisx") from exc
+            self._el = fisx.Elements()
+            self._el.initializeAsPyMca()
+        else:
+            raise ValueError(f"bilinmeyen backend: {backend}")
         if override_csv:
             self._load_override(Path(override_csv))
-        self._pair_ref: dict[str, float] = {}
 
     def _load_override(self, path: Path):
         import pandas as pd
@@ -80,6 +99,9 @@ class CrossSections:
             self._override[str(el)] = (g[cols["energy_kev"]].to_numpy(float), g[ycol].to_numpy(float))
 
     def components(self, symbol: str, energy_keV) -> dict[str, np.ndarray]:
+        """Partial processes (fisx backend only)."""
+        if self.backend != "fisx":
+            raise RuntimeError("components() için backend='fisx' gerekir")
         e = np.atleast_1d(np.asarray(energy_keV, dtype=float))
         if symbol not in ELEMENTS:
             raise KeyError(f"bilinmeyen element: {symbol}")
@@ -99,10 +121,16 @@ class CrossSections:
     def total(self, symbol: str, energy_keV):
         """Total mass attenuation coefficient (with coherent scattering), cm^2/g."""
         e = np.atleast_1d(np.asarray(energy_keV, dtype=float))
+        if symbol not in ELEMENTS:
+            raise KeyError(f"bilinmeyen element: {symbol}")
         if symbol in self._override:
             xs, ys = self._override[symbol]
             if e.min() >= xs.min() and e.max() <= xs.max():
                 return _loglog(e, xs, ys)
+        if self.backend == "table":
+            if e.min() < self._grid[0] or e.max() > self._grid[-1]:
+                raise ValueError(f"enerji tablo aralığının dışında ({self._grid[0]:.0f}-{self._grid[-1]:.0f} keV)")
+            return _loglog(e, self._grid, self._tab[self._row[symbol]])
         return self.components(symbol, e)["total"]
 
 

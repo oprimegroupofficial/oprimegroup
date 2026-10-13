@@ -78,7 +78,7 @@ def calibrate(spec: Spectrum, anchors=None, order: int | None = None, tol: float
     if len(found) < 2:
         raise RuntimeError(
             f"{spec.name}: enerji kalibrasyonu için yeterli çapa tepe bulunamadı ({len(found)}). "
-            "Yapılandırmada 'calibration.coefficients' ile elle kalibrasyon verin.")
+            "Yapılandırmada kalibrasyon katsayılarını elle verin.")
     ord_ = order or (2 if len(found) >= 4 else 1)
     cal = fit_calibration(found, order=ord_, n_channels=n)
     # reject gross outliers (> 2.5 % of E) once

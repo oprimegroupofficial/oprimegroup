@@ -71,7 +71,7 @@ def _dt(v):
             return datetime.strptime(str(v), fmt)
         except ValueError:
             pass
-    raise ConfigError(f"tarih/saat okunamadi: {v!r} (ornek: 2026-10-13 08:00)")
+    raise ConfigError(f"tarih/saat okunamadı: {v!r} (örnek: 2026-10-13 08:00)")
 
 
 def _regions_from_cfg(items) -> list[RegionSpec]:
@@ -97,21 +97,26 @@ def load_config(path: str | Path) -> Config:
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
-        raise ConfigError(f"{path.name} YAML hatasi: {exc}") from exc
+        raise ConfigError(f"{path.name} YAML hatası: {exc}") from exc
     base = Path(raw.get("temel_klasor", "."))          # all other paths are relative to this folder
     root = (path.parent / base).resolve() if not base.is_absolute() else base
+    return build_config(raw, root)
+
+
+def build_config(raw: dict, root: Path) -> Config:
+    """Config from the (Turkish-key) dictionary used in the YAML file; also used by the web version."""
 
     def res(p):
         p = Path(p)
         return p if p.is_absolute() else (root / p)
 
     if not raw.get("numuneler"):
-        raise ConfigError("'numuneler' listesi bos")
+        raise ConfigError("'numuneler' listesi boş")
     samples = []
     for s in raw["numuneler"]:
         for key in ("ad", "dosya"):
             if key not in s:
-                raise ConfigError(f"numune tanimi '{key}' icermiyor: {s}")
+                raise ConfigError(f"numune tanımı '{key}' içermiyor: {s}")
         comp = s.get("bilesim_agirlik")
         samples.append(SampleCfg(
             name=str(s["ad"]), file=str(s["dosya"]), thickness_mm=_as_list(s.get("kalinlik_mm")),
@@ -122,7 +127,7 @@ def load_config(path: str | Path) -> Config:
             start=_dt(s.get("baslangic"))))
     names = [s.name for s in samples]
     if len(set(names)) != len(names):
-        raise ConfigError("numune adlari benzersiz olmali")
+        raise ConfigError("numune adları benzersiz olmalı")
 
     blank = raw.get("bos_olcum") or {}
     cal = raw.get("kalibrasyon") or {}

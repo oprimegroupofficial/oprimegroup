@@ -83,3 +83,17 @@ def test_experimental_zeff_roundtrip(xs):
     (z, uz), (n, un) = ph.experimental_zeff(tp.mu_rho, 0.01 * tp.mu_rho, tp)
     assert z == pytest.approx(tp.zeff) and n == pytest.approx(tp.neff)
     assert uz / z == pytest.approx(0.01) and un / n == pytest.approx(0.01)
+
+
+def test_composition_parser():
+    from gamma_shielding.composition import CompositionError, parse_composition, parse_formula
+    c = parse_composition("Ni 0,7497; Al 0.1501, Bi 0.1002")
+    assert c["Ni"] == pytest.approx(0.7497, abs=1e-4) and sum(c.values()) == pytest.approx(1.0)
+    d = parse_composition("Dy2O3 5")                     # 5 wt% Dy2O3 -> Dy 0.8713 of it
+    assert d["Dy"] == pytest.approx(0.8713, abs=2e-4)
+    m = parse_composition("SiO2 50; B2O3 50", mode="mol")
+    assert m["Si"] / m["B"] == pytest.approx(ph.ELEMENTS["Si"][1] / (2 * ph.ELEMENTS["B"][1]), rel=1e-9)
+    assert parse_formula("Ca(OH)2") == {"Ca": 1.0, "O": 2.0, "H": 2.0}
+    for bad in ("", "Xx 5", "Ni", "Ni 0.5; Q 1", "Ca(OH 3"):
+        with pytest.raises(CompositionError):
+            parse_composition(bad)

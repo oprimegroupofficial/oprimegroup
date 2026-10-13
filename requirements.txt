@@ -4,6 +4,6 @@ pandas>=2.0
 matplotlib>=3.8
 openpyxl>=3.1
 pyyaml>=6.0
-fisx>=1.3
+# fisx>=1.3   (yalniz tools/make_xs_table.py ile tablo yeniden uretmek icin)
 # testler icin:
 pytest>=8.0

@@ -19,7 +19,7 @@ Kapsam dışı (bilinçli): EBF/EABF (buildup) ve hızlı nötron ΣR.
 ## Hızlı başlangıç
 
 ```bash
-pip install -r requirements.txt           # Python 3.10+
+pip install -r requirements.txt           # Python 3.10+ (fisx gerekmez; tesir kesiti tablosu pakette)
 python -m gamma_shielding config/config.yaml      # veya Windows'ta calistir.bat'a çift tıklayın
 ```
 
@@ -41,6 +41,19 @@ python -m gamma_shielding config/config.yaml      # veya Windows'ta calistir.bat
 | `yogunluk_g_cm3` | MAC, Zeff, Neff, kuramsal LAC |
 | `bilesim_agirlik` | Zeff, Neff, tüm kuramsal değerler |
 
+## Web sürümü (tarayıcıda, sunucusuz)
+
+Aynı kod **Pyodide** ile tarayıcıda çalışır: `.Spc` dosyalarını sürükleyin, kalınlık/yoğunluk/bileşimi formdan girin,
+sonuçları (tablo, grafik, Excel, zip) indirin. Cloudflare Pages'e zip olarak yüklenir.
+
+```bash
+python tools/build_web.py                  # dist/gama-zirhlama-web.zip  (1.7 MB, Pyodide CDN'den)
+python tools/vendor_pyodide.py <pyodide>   # dist/gama-zirhlama-web-tam.zip (41 MB, dış bağımlılık yok)
+```
+Yayınlama adımları: [`web/YAYINLA.md`](web/YAYINLA.md). Tarayıcı sonuçları yerel Python ile
+karşılaştırılarak doğrulanmıştır (net alan farkı < 2×10⁻⁴; `tests/e2e_web.py`).
+Bileşim kutusu elementleri (`Ni 0.75; Al 0.15`) ya da bileşikleri (`Dy2O3 5; SiO2 60`) ağırlık veya mol olarak kabul eder.
+
 ## Yöntem (özet)
 
 * **Kalibrasyon** her spektrum için ayrı ve otomatik: Ba-133/Cs-137/Co-60 tepeleri başlıktaki yaklaşık kalibrasyonla bulunur, 2. derece polinom uydurulur (başlıktaki kalibrasyon bu cihazda %3 kadar kaymış olabilir). Elle: `kalibrasyon: katsayilar: [c0, c1, c2]`.
@@ -48,12 +61,12 @@ python -m gamma_shielding config/config.yaml      # veya Windows'ta calistir.bat
 * **Model belirsizliği:** fon derecesi, pencere genişliği ve yapısal alternatifler (basamak, σ bağlama, Compton kenarı) *aynı biçimde hem I₀'a hem numuneye* uygulanır; **ln(I₀/I)'nın varyantlar arası standart sapması** hata bütçesine eklenir (ortak sistematikler oranda kendiliğinden sönümlenir).
 * **Sayım hızı** = net alan / canlı süre. Bozunma düzeltmesi isteğe bağlıdır (`bozunma_duzeltmesi`).
 * Formüller ve belirsizlik yayılımı: `output/rapor.md` §8 ve `gamma_shielding/physics.py` başı.
-* Kuramsal tesir kesitleri **EPDL97** (`fisx`) – XCOM ile 0.05–2 MeV'de tipik olarak %1–2 fark. **XCOM ile birebir** istiyorsanız elementel XCOM değerlerini `element,energy_keV,mu_rho_cm2_g` CSV'si olarak verip `xcom_csv:` ile bağlayın. (`fisx`'in çift oluşum sütunu 1022–1250 keV arasında hatalıdır; `xsec.py` bunu düzeltir – 1173 keV için önemli.)
+* Kuramsal tesir kesitleri **EPDL97** (pakete gömülü tablo; `tools/make_xs_table.py` + `fisx` ile üretildi, doğrudan hesaba göre <%0.1) – XCOM ile 0.05–2 MeV'de tipik olarak %1–2 fark. **XCOM ile birebir** istiyorsanız elementel XCOM değerlerini `element,energy_keV,mu_rho_cm2_g` CSV'si olarak verip `xcom_csv:` ile bağlayın. (`fisx`'in çift oluşum sütunu 1022–1250 keV arasında hatalıdır; `xsec.py` bunu düzeltir – 1173 keV için önemli.)
 * Yeni kaynak/çizgi: `gamma_shielding/lines.py` veya yapılandırmada `bolgeler:` ile (bkz. `config.py`).
 
 ## Doğrulama
 
-`python -m pytest tests -m "not slow"` (32 test) ve `-m slow`:
+`python -m pytest tests -m "not slow"` (41 test) ve `-m slow`:
 
 * sentetik spektrumlarda (bilinen μ) 14 tekrar × 6 çizgi: **pull ortalaması +0.01, std 0.89** → yanlılık yok, hata payları doğru/hafif muhafazakâr;
 * belirsizlik yayılımı Monte Carlo ile, Zeff (saf element → Z), kuramsal MAC (NIST: Pb, Al, H, su), çift oluşum düzeltmesi, `.Spc` okuyucu (gerçek dosyalar), yapılandırma hataları.
